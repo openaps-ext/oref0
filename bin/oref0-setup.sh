@@ -894,6 +894,8 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 
     sudo pip install flask || die "Can't add xdrip cgm - error installing flask"
     sudo pip install flask-restful || die "Can't add xdrip cgm - error installing flask-restful"
+    sudo pip install flask-cors || die "Can't install flask-cors"
+    sudo pip install python-dateutil
 
     # xdrip CGM (xDripAPS)
     if [[ ${CGM,,} =~ "xdrip" ]]; then
@@ -1046,6 +1048,10 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 #    openaps mmtune
 #    echo
 
+    # create oref0.json and flask.json
+    echo "{ \"OREF0_CAN_RUN\": true }" > "$directory/oref0.json"
+    echo "{ \"AUTHORIZATION_ENABLED\": true }" > "$directory/flask_server.json"
+
     read -p "Schedule openaps in cron? y/[N] " -r
     if [[ $REPLY =~ ^[Yy]$ ]]; then
 
@@ -1095,7 +1101,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
             (crontab -l; crontab -l | grep -q "reset_spi_serial.py" || echo "@reboot reset_spi_serial.py") | crontab -
             (crontab -l; crontab -l | grep -q "oref0-radio-reboot" || echo "* * * * * oref0-radio-reboot") | crontab -
         fi
-        (crontab -l; crontab -l | grep -q "cd $directory && ( ps aux | grep -v grep | grep bash | grep -q 'bin/oref0-pump-loop'" || echo "* * * * * cd $directory && ( ps aux | grep -v grep | grep bash | grep -q 'bin/oref0-pump-loop' || oref0-pump-loop ) 2>&1 | tee -a /var/log/openaps/pump-loop.log") | crontab -
+        (crontab -l; crontab -l | grep -q "cd $directory && cat oref0.json | jq '.OREF0_CAN_RUN' | grep -q 'true' &&  ( ps aux | grep -v grep | grep bash | grep -q 'bin/oref0-pump-loop'" || echo "* * * * * cd $directory && ( ps aux | grep -v grep | grep bash | grep -q 'bin/oref0-pump-loop' || oref0-pump-loop ) 2>&1 | tee -a /var/log/openaps/pump-loop.log") | crontab -
         if [[ ! -z "$BT_PEB" ]]; then
         (crontab -l; crontab -l | grep -q "cd $directory && ( ps aux | grep -v grep | grep -q 'peb-urchin-status $BT_PEB '" || echo "* * * * * cd $directory && ( ps aux | grep -v grep | grep -q 'peb-urchin-status $BT_PEB' || peb-urchin-status $BT_PEB ) 2>&1 | tee -a /var/log/openaps/urchin-loop.log") | crontab -
         fi
