@@ -14,6 +14,8 @@
 # -  when subcommand outputs are not needed in the main log file:
 #    - redirect the output to either fd >&3 or fd >&4 based on
 #    - when you want the output visible.
+export MEDTRONIC_PUMP_ID=`get_pref_string .pump_serial | tr -cd 0-9`
+export MEDTRONIC_FREQUENCY=`cat monitor/medtronic_frequency.ini`
 OREF0_DEBUG=${OREF0_DEBUG:-0}
 if [[ "$OREF0_DEBUG" -ge 1 ]] ; then
   exec 3>&1

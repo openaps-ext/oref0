@@ -1038,6 +1038,43 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         cd $HOME/myopenaps && openaps alias remove battery-status; openaps alias add battery-status '! bash -c "sudo ~/src/openaps-menu/scripts/getvoltage.sh > monitor/edison-battery.json"'
     fi
 
+    # Install Golang
+    mkdir -p $HOME/go
+    source $HOME/.bash_profile
+    golangversion=1.12.5
+    if go version | grep go${golangversion}.; then
+        echo Go already installed
+    else
+        echo "Removing possible old go install..."
+        rm -rf /usr/local/go/*
+        echo "Installing Golang..."
+        if uname -m | grep armv; then
+            cd /tmp && wget -c https://storage.googleapis.com/golang/go${golangversion}.linux-armv6l.tar.gz && tar -C /usr/local -xzvf /tmp/go${golangversion}.linux-armv6l.tar.gz
+        elif uname -m | grep i686; then
+            cd /tmp && wget -c https://dl.google.com/go/go${golangversion}.linux-386.tar.gz && tar -C /usr/local -xzvf /tmp/go${golangversion}.linux-386.tar.gz
+        fi
+    fi
+    if ! grep GOROOT $HOME/.bash_profile; then
+        sed --in-place '/.*GOROOT*/d' $HOME/.bash_profile
+        echo 'GOROOT=/usr/local/go' >> $HOME/.bash_profile
+        echo 'export GOROOT' >> $HOME/.bash_profile
+    fi
+    if ! grep GOPATH $HOME/.bash_profile; then
+        sed --in-place '/.*GOPATH*/d' $HOME/.bash_profile
+        echo 'GOPATH=$HOME/go' >> $HOME/.bash_profile
+        echo 'export GOPATH' >> $HOME/.bash_profile
+        echo 'PATH=$PATH:/usr/local/go/bin:$GOROOT/bin:$GOPATH/bin' >> $HOME/.bash_profile
+        sed --in-place '/.*export PATH*/d' $HOME/.bash_profile
+        echo 'export PATH' >> $HOME/.bash_profile
+    fi
+    source $HOME/.bash_profile
+
+    if [[ ${radio_locale,,} =~ "ww" ]]; then
+      echo 868.4 > $directory/monitor/medtronic_frequency.ini
+    else
+      echo 916.55 > $directory/monitor/medtronic_frequency.ini
+    fi
+
     if [[ "$ttyport" =~ "spi" ]]; then
         echo Resetting spi_serial
         reset_spi_serial.py
@@ -1065,6 +1102,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         # add crontab entries
         (crontab -l; crontab -l | grep -q "NIGHTSCOUT_HOST" || echo NIGHTSCOUT_HOST=$NIGHTSCOUT_HOST) | crontab -
         (crontab -l; crontab -l | grep -q "API_SECRET=" || echo API_SECRET=$API_HASHED_SECRET) | crontab -
+        (crontab -l; crontab -l | grep -q "MEDTRONIC_PUMP_ID=" || echo API_SECRET=$serial) | crontab -
         (crontab -l; crontab -l | grep -q "PATH=" || echo "PATH=$PATH" ) | crontab -
         (crontab -l; crontab -l | grep -q "oref0-online $BT_MAC" || echo '* * * * * ps aux | grep -v grep | grep -q "oref0-online '$BT_MAC'" || cd '$directory' && oref0-online '$BT_MAC' 2>&1 >> /var/log/openaps/network.log' ) | crontab -
         # temporarily disable hotspot for 1m every hour to allow it to try to connect via wifi again
