@@ -484,33 +484,23 @@ function preflight {
 
 # reset radio, init world wide pump (if applicable), mmtune, and wait_for_silence 60 if no signal
 function mmtune {
-    if grep "carelink" pump.ini 2>&1 >/dev/null; then
-    echo "using carelink; skipping mmtune"
-        return
-    fi
-
-    # TODO: remove reset_spi_serial.py once oref0_init_pump_comms.py is fixed to do it correctly
-    if [[ $port == "/dev/spidev5.1" ]]; then
-        reset_spi_serial.py 2>&3
-    fi
-    oref0_init_pump_comms.py
-    echo -n "Listening for 40s silence before mmtuning: "
-    for i in $(seq 1 800); do
-        echo -n .
-        any_pump_comms 40 2>&3 | egrep -v subg | egrep -q No \
-        && echo "No interfering pump comms detected from other rigs (this is a good thing!)" \
-        && break
-    done
-    echo {} > monitor/mmtune.json
-    echo -n "mmtune: " && timerun openaps report invoke monitor/mmtune.json 2>&3 >&4 | tail -1
-    grep -v setFreq monitor/mmtune.json | grep -A2 $(json -a setFreq -f monitor/mmtune.json) | while read line
-        do echo -n "$line "
-    done
-    rssi_wait=$(grep -v setFreq monitor/mmtune.json | grep -A2 $(json -a setFreq -f monitor/mmtune.json) | tail -1 | awk '($1 < -60) {print -($1+60)*2}')
-    if [[ $rssi_wait > 1 ]]; then
+    #carelink is deprecated in 0.7.0
+    #if grep "carelink" pump.ini 2>&1 >/dev/null; then
+    #echo "using carelink; skipping mmtune"
+    #    return
+    #fi
+    echo -n "Listening for $upto45s s silence before mmtuning: "
+    wait_for_silence $upto45s
+    oref0-mmtune
+    MEDTRONIC_FREQUENCY=`cat monitor/medtronic_frequency.ini`
+    #Determine how long to wait, based on the RSSI value of the best frequency
+    rssi_wait=$(grep -v setFreq monitor/mmtune.json | grep -A2 $(jq .setFreq monitor/mmtune.json) | tail -1 | awk '($1 < -60) {print -($1+60)*2}')
+    if [[ $rssi_wait -gt 1 ]]; then
+        if [[ $rssi_wait -gt 90 ]]; then
+            rssi_wait=90
+        fi
         echo "waiting for $rssi_wait second silence before continuing"
         wait_for_silence $rssi_wait
-        preflight
         echo "Done waiting for rigs with better signal."
     else
         echo "No wait required."
